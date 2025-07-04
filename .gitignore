@@ -1,0 +1,11 @@
+# Rust
+target/
+
+# JetBrains IDEs
+.idea/
+
+# Nix
+.direnv/
+
+# diagrams
+*.bkp
