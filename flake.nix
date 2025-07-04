@@ -23,8 +23,72 @@
         craneLib = (inputs.crane.mkLib pkgs).overrideToolchain (
           p: p.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml
         );
+        src = craneLib.cleanCargoSource ./.;
+        commonArgs = {
+          inherit src;
+          strictDeps = true;
+          CARGO_PROFILE = "release";
+        };
+        cargoArtifacts = craneLib.buildDepsOnly commonArgs;
+        rusty-nix = craneLib.buildPackage (
+          commonArgs // {
+            inherit cargoArtifacts;
+          }
+        );
       in
       {
+        packages = {
+          inherit rusty-nix;
+          default = rusty-nix;
+        };
+        nixosModules.rusty-nix = { lib, config, ... }:
+          let
+            cfg = config.rusty-nix;
+          in
+          {
+            options.rusty-nix = {
+              enable = lib.mkEnableOption "Enables rusty-nix service.";
+              user = {
+                name = lib.mkOption {
+                  type = lib.types.str;
+                  default = "rusty";
+                };
+                group = lib.mkOption {
+                  type = lib.types.str;
+                  default = "rusty";
+                };
+              };
+              service = {
+                name = lib.mkOption {
+                  type = lib.types.str;
+                  default = "rusty-nix";
+                };
+              };
+            };
+            config = lib.mkIf cfg.enable {
+              users.users."${cfg.user.name}" = {
+                group = "${cfg.user.group}";
+                isSystemUser = true;
+                linger = true;
+              };
+              users.groups."${cfg.user.group}" = {
+              };
+              systemd.services."${cfg.service.name}" = {
+                enable = true;
+                description = "The rusty-nix service.";
+                unitConfig = {
+                  Type = "simple";
+                  # ...
+                };
+                serviceConfig = {
+                  ExecStart = "${rusty-nix}/bin/hello-rusty-nix";
+                  User = "${cfg.user.name}";
+                  Group = "${cfg.user.group}";
+                };
+                wantedBy = [ "multi-user.target" ];
+              };
+            };
+          };
         devShells.default = craneLib.devShell {
           # additional packages for the dev shell
           packages = with pkgs; [

@@ -6,6 +6,7 @@ target/
 
 # Nix
 .direnv/
+/result
 
 # diagrams
 *.bkp
